@@ -1,0 +1,109 @@
+x-docker-common:
+  &docker-common
+  networks:
+    - kafka-o11y
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+
+x-kafka-common:
+  &kafka-common
+  image: docker.io/bitnami/kafka:3.9
+  ports:
+    - "9092"
+  environment:
+    &kafka-common-env
+    JMX_PORT: 9999
+    # KRaft settings
+    KAFKA_CFG_PROCESS_ROLES: controller,broker
+    KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+    KAFKA_KRAFT_CLUSTER_ID: abcdefghijklmnopqrstuv
+    # Listeners
+    KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+    KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+    KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    # Clustering
+    KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+    KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+    KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+x-jmx-exporter-common:
+  &jmx-exporter-common
+  image: docker.io/bitnami/jmx-exporter:1.2.0
+  ports:
+    - "7071"
+  volumes:
+    - ./exporter/jmx-exporter.yaml:/etc/jmx_exporter/config.yaml.template
+    - ./exporter/entrypoint.sh:/entrypoint.sh
+  entrypoint: /bin/sh /entrypoint.sh
+
+services:
+  kafka-0:
+    <<: *docker-common
+    <<: *kafka-common
+    container_name: kafka-0
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-0:9092
+    volumes:
+      - kafka_0_data:/bitnami/kafka
+
+  kafka-1:
+    <<: *docker-common
+    <<: *kafka-common
+    container_name: kafka-1
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092
+    volumes:
+      - kafka_1_data:/bitnami/kafka
+
+  kafka-2:
+    <<: *docker-common
+    <<: *kafka-common
+    container_name: kafka-2
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: 2
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092
+    volumes:
+      - kafka_2_data:/bitnami/kafka
+
+  jmx-exporter-0:
+    <<: *docker-common
+    <<: *jmx-exporter-common
+    container_name: jmx-exporter-0
+    environment:
+      - JMX_HOST=kafka-0
+      - JMX_PORT=9999
+
+  jmx-exporter-1:
+    <<: *docker-common
+    <<: *jmx-exporter-common
+    container_name: jmx-exporter-1
+    environment:
+      - JMX_HOST=kafka-1
+      - JMX_PORT=9999
+
+  jmx-exporter-2:
+    <<: *docker-common
+    <<: *jmx-exporter-common
+    container_name: jmx-exporter-2
+    environment:
+      - JMX_HOST=kafka-2
+      - JMX_PORT=9999
+
+volumes:
+  kafka_0_data:
+  kafka_1_data:
+  kafka_2_data:
+
+networks:
+  kafka-o11y:
+    external:
+      true
