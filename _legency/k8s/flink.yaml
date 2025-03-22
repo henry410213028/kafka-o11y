@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-job
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink-job
+  template:
+    metadata:
+      labels:
+        app: flink-job
+    spec:
+      containers:
+        - name: flink-job
+          image: your-docker-hub-account/flink-job:latest # 替換成你的 image
+          imagePullPolicy: Always
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka-service:9092"

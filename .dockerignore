@@ -1,0 +1,14 @@
+.git/
+.github/
+.idea/
+.sphinx/
+.pytest_cache
+data/
+examples/
+extensions/
+imgs/
+multiproc-tmp/
+*.csv
+*.json
+*.jsonl
+*.sqlite3

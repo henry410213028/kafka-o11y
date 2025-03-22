@@ -1,0 +1,26 @@
+x-docker-common:
+  &docker-common
+  networks:
+    - kafka-o11y
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+
+services:
+  kafka-consumer:
+    <<: *docker-common
+    container_name: kafka-consumer
+    image: kafka-consumer
+    build:
+      context: consumer
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
+      KAFKA_TOPIC: "system-metrics"
+
+networks:
+  kafka-o11y:
+    external:
+      true

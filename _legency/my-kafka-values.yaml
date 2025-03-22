@@ -1,0 +1,13 @@
+replicaCount: 1
+
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "500m"
+  limits:
+    memory: "4Gi"
+    cpu: "1000m"
+
+kafka:
+  heapOpts: "-Xmx2g -Xms1g"
+

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: top-producer
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: top-producer
+  template:
+    metadata:
+      labels:
+        app: top-producer
+    spec:
+      containers:
+      - name: producer
+        image: your-docker-hub-account/top-producer:latest  # 替換成你的 Docker Hub 帳號和映像名稱
+        imagePullPolicy: Always # 每次都拉image
+        env:
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            value: "kafka-service:9092"

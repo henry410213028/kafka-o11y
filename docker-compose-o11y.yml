@@ -1,0 +1,59 @@
+x-docker-common:
+  &docker-common
+  networks:
+    - kafka-o11y
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+
+services:
+  prometheus:
+    <<: *docker-common
+    container_name: prometheus
+    image: docker.io/bitnami/prometheus:2.55.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention=7d'
+
+  grafana:
+    <<: *docker-common
+    container_name: grafana
+    image: grafana/grafana:11.3.1
+    ports:
+      - '3001:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_RENDERING_SERVER_URL: "http://grafana-image-renderer:8088/render"
+      GF_RENDERING_CALLBACK_URL: "http://grafana:3001/"
+
+  grafana-image-renderer:
+    <<: *docker-common
+    container_name: grafana-image-renderer
+    image: grafana/grafana-image-renderer:3.11.6
+    ports:
+      - '8088:8088'
+    environment:
+      HTTP_HOST: "0.0.0.0"
+      HTTP_PORT: "8088"
+      ENABLE_METRICS: 'true'
+    depends_on:
+      - grafana
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  kafka-o11y:
+    external:
+      true

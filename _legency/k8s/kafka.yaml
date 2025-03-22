@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: monitoring
+spec:
+  serviceName: "kafka-service"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+      - name: kafka
+        image: bitnami/kafka:latest
+        ports:
+        - containerPort: 9092
+        env:
+        - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+          value: "zookeeper-service:2181"
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://kafka-service:9092"
+        - name: KAFKA_CFG_BROKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name # Broker ID based on pod name
+        - name: KAFKA_CFG_LISTENERS
+          value: "PLAINTEXT://:9092"
+        - name: KAFKA_CFG_LOG_DIRS
+          value: "/bitnami/kafka/data"
+        - name: KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "3" # Replication factor for internal topics
+        - name: KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+          value: "3" # Replication factor for transaction logs
+        - name: KAFKA_CFG_DEFAULT_REPLICATION_FACTOR
+          value: "3" # Default replication factor for new topics
+        - name: KAFKA_CFG_NUM_PARTITIONS
+          value: "3" # Default number of partitions
+        volumeMounts:
+        - name: data
+          mountPath: /bitnami/kafka/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: kafka-pvc #使用已經定義的persistentVolumeClaim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: monitoring
+spec:
+  ports:
+  - port: 9092
+    targetPort: 9092
+  selector:
+    app: kafka
+  clusterIP: None
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi #定義pvc大小

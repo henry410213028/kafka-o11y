@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: monitoring
+spec:
+  serviceName: "zookeeper-service"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+      - name: zookeeper
+        image: bitnami/zookeeper:latest
+        ports:
+        - containerPort: 2181
+        env:
+        - name: ALLOW_ANONYMOUS_LOGIN
+          value: "yes"
+        - name: ZOO_MY_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ZOO_SERVERS
+          value: "server.0=zookeeper-0.zookeeper-service:2888:3888 server.1=zookeeper-1.zookeeper-service:2888:3888 server.2=zookeeper-2.zookeeper-service:2888:3888"
+        volumeMounts:
+        - name: data
+          mountPath: /bitnami/zookeeper/data
+        - name: datalog
+          mountPath: /bitnami/zookeeper/datalog
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: zookeeper-pvc-data
+      - name: datalog
+        persistentVolumeClaim:
+          claimName: zookeeper-pvc-datalog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-service
+  namespace: monitoring
+spec:
+  ports:
+  - port: 2181
+    targetPort: 2181
+  selector:
+    app: zookeeper
+  clusterIP: None
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zookeeper-pvc-data
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zookeeper-pvc-datalog
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
