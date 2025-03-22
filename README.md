@@ -71,8 +71,6 @@ Consumer receives the top command output from kafka and print the 5 processes wi
 make deploy-consumer
 ```
 
-![kafka-consumer](images/kafka-consumer.png)
-
 6. Send top command output to Kafka.
 
 >> WARNING: Linux only, because the top command output is different on macOS.
