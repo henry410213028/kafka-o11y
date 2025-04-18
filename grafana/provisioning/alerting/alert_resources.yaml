@@ -1,0 +1,33 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: discord
+    receivers:
+      - uid: discord
+        type: discord
+        settings:
+          url: $DISCORD_WEBHOOK_URL
+          use_discord_username: false
+          message: '{{ template "custom.alerts" . }}'
+        disableResolveMessage: false
+
+templates:
+  - name: discord.message
+    template: |
+      {{ define "custom.alerts" }}
+      {{ range .Alerts }}
+      {{ template "custom.message" . }}
+      {{ end }}
+      {{ end }}
+
+      {{ define "custom.message" }}
+      {{ if eq .Status "firing" }}🔥 Firing{{ else if eq .Status "resolved" }}✅ Resolved{{ end }}
+        * Severity: {{ if .Labels.severity }}{{ .Labels.severity }}{{ else }}N/A{{ end }}
+        * Cluster: {{ if .Labels.cluster }}{{ .Labels.cluster }}{{ else }}N/A{{ end }}
+        * Service: {{ if .Labels.service }}{{ .Labels.service }}{{ else }}N/A{{ end }}
+        * Name: {{ if .GeneratorURL }}[{{ .Labels.alertname }}]({{ .GeneratorURL }}){{ else }}{{ .Labels.alertname }}{{ end }}
+        * Start Time: {{ if .StartsAt }}{{ .StartsAt | tz "Asia/Taipei" }}{{ else }}N/A{{ end }}
+        * End Time: {{ if .EndsAt }}{{ .EndsAt | tz "Asia/Taipei" }}{{ else }}N/A{{ end }}
+        * Summary: {{ if .Annotations.summary }}{{ .Annotations.summary }}{{ else }}N/A{{ end }}
+        * Description: {{ if .Annotations.description }}{{ .Annotations.description }}{{ else }}N/A{{ end }}
+      {{ end }}

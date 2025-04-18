@@ -38,6 +38,13 @@ Requirements:
 - Linux (Ubuntu)
 - Docker
 - Docker Compose
+- Discord webhook (optional)
+
+0. (Optional) Create a `.env` file in the root directory, you can copy the file from `.env.sample`, and set the `DISCORD_WEBHOOK_URL` variable. This is used to send alert notifications to Discord. And you can set the `GF_SERVER_ROOT_URL` variable to you host machine IP address and port, if you want to access Grafana alerting from outside of the docker network.
+
+Before creating a webhook, you need to have a Discord server and a channel.
+
+[This documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) will help you to create a Discord webhook.
 
 1. Create a new docker network for this stack.
 
@@ -99,9 +106,31 @@ Check the prometheus scrape targets at `http://localhost:9090/targets`.
 
 ### Dashboard
 
-There are three dashboards provided in this project, `Kafka Cluster`, `Kafka Topics`, and `KRaft`.
+There are four dashboards provided in this project, `Kafka Core`, `Kafka Cluster`, `Kafka Topics`, and `KRaft`.
 
 ![grafana-dashboards](images/grafana-dashboards.png)
+
+#### Kafka Core
+
+`Kafka Core` dashboard shows some core metrics of Kafka, including the number of controllers, brokers, partitions. It gives us a high-level overview of the cluster's health and operational status.
+
+This dashboard provides the following metrics:
+
+- **Active Controllers**: Shows the number of active controllers in the cluster, which is usually 1. If it is lower than 1, it indicates that the cluster has no active controller, and if it is greater than 1, it indicates that there are multiple active controllers, which is not normal.
+
+- **Brokers Online**: Shows the number of online brokers in the cluster, which is usually equal to the number of brokers in the cluster. If it is lower than the number of brokers, it indicates that some brokers are offline.
+
+- **Unclean Leader Election Rate**: Shows the rate of unclean leader elections, which is the number of times a broker has been elected as a leader for a partition without being in sync with the other replicas. This can lead to data loss, so it should be monitored closely.
+
+- **Under Replicated Partitions**: Shows the number of under-replicated partitions, which are partitions that have fewer replicas than the configured replication factor. This can lead to data loss if the leader broker goes down.
+
+- **Under Min ISR Partitions**: Shows the number of partitions that have fewer in-sync replicas than the configured minimum in-sync replicas. This can lead to data loss if the leader broker goes down.
+
+- **Offline Partitions Count**: Shows the number of offline partitions, which are partitions that have no leader broker. This can lead to data loss if the leader broker goes down.
+
+- **Errors**: Shows the number of errors encountered in the Kafka cluster, which can indicate issues with message production or consumption, and should be monitored closely.
+
+![kafka-core](images/kafka-core.png)
 
 #### Kafka Cluster
 
@@ -152,6 +181,42 @@ This dashboard shows the metrics of KRaft mode, including the record append/fetc
 If the latency of the raft commit is increasing, it may indicate that the cluster metadata synchronization issue.
 
 ![kraft](images/kraft.png)
+
+### Alerting
+
+This project also provides some alerting rules on Grafana, these rules are based on the core metrics in the `Kafka Core` dashboard.
+
+![grafana-alert-normal](images/grafana-alert-normal.png)
+
+Let's try to trigger the alert by stopping the Kafka broker.
+
+```bash
+docker stop kafka-1
+```
+
+You can see some core metrics are changed, including the number of active brokers, partitions and under replicated partitions.
+
+![kafka-core-abnormal](images/kafka-core-abnormal.png)
+
+About a minute later, you will see the alert is triggered, and you will receive a notification on Discord.
+
+![grafana-alert-abnormal](images/grafana-alert-abnormal.png)
+
+Notify message contains the alert name, state, summary and some service labels.
+
+You can click the link to view the alert in Grafana. (If you set the `GF_SERVER_ROOT_URL` variable in `.env` file)
+
+![discord-firing](images/discord-firing.png)
+
+Then, let's restart the Kafka broker, and see the alert is resolved.
+
+```bash
+docker start kafka-1
+```
+
+About a minute later, you will see the alert is resolved, and you will receive a resolved notification on Discord.
+
+![discord-resolved](images/discord-resolved.png)
 
 ## References
 

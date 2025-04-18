@@ -1,0 +1,334 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Core
+    folder: System
+    interval: 1m
+    rules:
+      # 1. Active Controllers (Cluster Level)
+      - uid: kafka_active_controller_count_anomaly
+        title: Kafka Active Controller Count Anomaly (Cluster)
+        condition: B
+        for: 1m
+        labels:
+          severity: critical
+          cluster: dev
+          service: kafka
+        annotations:
+          summary: Kafka active controller count is not equal to 1 (Cluster Level)
+          description: >
+            Detected that the number of active Kafka controllers in the cluster is not equal to 1.
+            The normal state should be 1. A count of 0 indicates no active controller.
+            A count greater than 1 might indicate a split-brain scenario.
+            Please check the controller logs and cluster status immediately.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(kafka_controller_kafkacontroller_activecontrollercount{job="kafka-broker",env="dev"})
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: '$A != 1'
+              refId: B
+        noDataState: NoData
+        execErrState: Error
+        isPaused: false
+        notification_settings: # Inherits group settings or specify individually
+          receiver: discord
+
+      # 2. Brokers Online
+      - uid: kafka_brokers_online_below_expected
+        title: Kafka Brokers Online Below Expected
+        condition: C
+        for: 3m
+        labels:
+          severity: critical
+          cluster: dev
+          service: kafka
+        annotations:
+          summary: Fewer Kafka brokers online than expected
+          description: >
+            The current number of online Kafka brokers (leading partitions) is less than the expected 3.
+            This indicates that one or more brokers might be down or not leading any partition.
+            Please check the broker logs and cluster health.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: count(kafka_server_replicamanager_leadercount{job="kafka-broker",env="dev"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [3]
+                    type: lt
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { params: [], type: last }
+                  type: query
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: A
+              intervalMs: 1000
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        isPaused: false
+        notification_settings:
+          receiver: discord
+
+      # 3. Unclean Leader Election Rate
+      - uid: kafka_unclean_leader_elections
+        title: Kafka Unclean Leader Elections Occurred
+        condition: C
+        for: 1m
+        labels:
+          severity: critical
+          cluster: dev
+          service: kafka
+        annotations:
+          summary: Kafka unclean leader elections are occurring
+          description: >
+            Detected an unclean leader election rate per second greater than 0.
+            Any value greater than 0 indicates a potential risk of data loss
+            because the new leader might not be fully synchronized. Please investigate immediately.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              # Using sum rate better reflects the overall situation, but the original CSV is sum(metric),
+              # and the metric itself is persec, so directly sum.
+              expr: sum(kafka_controller_controllerstats_uncleanleaderelectionspersec{job="kafka-broker",env="dev"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { params: [], type: last }
+                  type: query
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: A
+              intervalMs: 1000
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        isPaused: false
+        notification_settings:
+          receiver: discord
+
+      # 4. Under Replicated Partitions
+      - uid: kafka_under_replicated_partitions
+        title: Kafka Has Under Replicated Partitions
+        condition: C
+        for: 5m
+        labels:
+          severity: warning
+          cluster: dev
+          service: kafka
+        annotations:
+          summary: Kafka has persistently under replicated partitions
+          description: >
+            Detected the existence of under-replicated partitions (ISR count < total replica count).
+            Their count is continuously greater than 0. This indicates a decreased fault tolerance.
+            Please check broker health, network connectivity, and replica status.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: sum(kafka_server_replicamanager_underreplicatedpartitions{job="kafka-broker",env="dev"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { params: [], type: last }
+                  type: query
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: A
+              intervalMs: 1000
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        isPaused: false
+        notification_settings:
+          receiver: discord
+
+      # 5. Under Min ISR Partitions
+      - uid: kafka_under_min_isr_partitions
+        title: Kafka Has Partitions Under Min ISR
+        condition: C
+        for: 1m
+        labels:
+          severity: critical
+          cluster: dev
+          service: kafka
+        annotations:
+          summary: Kafka has partitions below the minimum in-sync replicas (min.insync.replicas)
+          description: >
+            Detected partitions with an ISR count lower than the configured min.insync.replicas.
+            Their count is greater than 0. Producers using acks=all will be unable to write to these partitions.
+            This requires immediate attention. Please check broker health and replica status.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: sum(kafka_cluster_partition_underminisr{job="kafka-broker",env="dev"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { params: [], type: last }
+                  type: query
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: A
+              intervalMs: 1000
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        isPaused: false
+        notification_settings:
+          receiver: discord
+
+      # 6. Offline Partitions Count
+      - uid: kafka_offline_partitions
+        title: Kafka Has Offline Partitions
+        condition: C
+        for: 1m
+        labels:
+          severity: critical
+          cluster: dev
+          service: kafka
+        annotations:
+          summary: Kafka has offline partitions (no active leader)
+          description: >
+            Detected the existence of offline partitions (no active leader). Their count is greater than 0.
+            These partitions are unavailable for read and write operations.
+            Please investigate the cause immediately (e.g., broker unavailability).
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: sum(kafka_controller_kafkacontroller_offlinepartitionscount{job="kafka-broker",env="dev"})
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { params: [], type: last }
+                  type: query
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: A
+              intervalMs: 1000
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        isPaused: false
+        notification_settings:
+          receiver: discord
+
+      # 7. Errors Rate
+      - uid: kafka_request_errors_rate
+        title: Kafka Request Errors Rate High
+        condition: B
+        for: 1m
+        labels:
+          severity: warning
+          cluster: dev
+          service: kafka
+          error: '{{ $labels.error }}' # Keep this label to see the error type in the alert payload
+        annotations:
+          summary: Kafka request errors rate is high
+          description: >
+            Detected a non-zero rate of Kafka request errors per second.
+            This indicates potential issues with brokers or clients.
+            Please check broker logs and client configurations for specific error types.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (error) (label_replace(rate(kafka_network_requestmetrics_errorspersec{job="kafka-broker",env="dev", error!="NONE"}[5m]),"error","unknown","error","^$"))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: $A != 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: math
+        noDataState: Alerting
+        execErrState: Error
+        isPaused: false
+        notification_settings:
+          receiver: discord

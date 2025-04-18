@@ -2353,7 +2353,7 @@
                 "uid": "prometheus"
               },
               "exemplar": true,
-              "expr": "sum without(instance,topic)(rate(kafka_server_brokertopicmetrics_bytesinpersec{job=\"kafka-broker\",env=\"$env\",topic!=\"\"}[5m]))",
+              "expr": "sum without(topic)(rate(kafka_server_brokertopicmetrics_bytesinpersec{job=\"kafka-broker\",env=\"$env\",topic!=\"\"}[5m]))",
               "interval": "",
               "intervalFactor": 2,
               "legendFormat": "bytes/sec",
