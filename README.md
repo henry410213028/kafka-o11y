@@ -40,37 +40,37 @@ Requirements:
 - Docker Compose
 - Discord webhook (optional)
 
-0. (Optional) Create a `.env` file in the root directory, you can copy the file from `.env.sample`, and set the `DISCORD_WEBHOOK_URL` variable. This is used to send alert notifications to Discord. And you can set the `GF_SERVER_ROOT_URL` variable to you host machine IP address and port, if you want to access Grafana alerting from outside of the docker network.
+1. (Optional) Create a `.env` file in the root directory, you can copy the file from `.env.sample`, and set the `DISCORD_WEBHOOK_URL` variable. This is used to send alert notifications to Discord. And you can set the `GF_SERVER_ROOT_URL` variable to you host machine IP address and port, if you want to access Grafana alerting from outside of the docker network.
 
 Before creating a webhook, you need to have a Discord server and a channel.
 
 [This documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) will help you to create a Discord webhook.
 
-1. Create a new docker network for this stack.
+2. Create a new docker network for this stack.
 
 ```bash
 docker network create kafka-o11y
 ```
 
-2. Pull and build required docker images.
+3. Pull and build required docker images.
 
 ```bash
 make build
 ```
 
-3. Setup Kafka cluster and all the exporters. This project use KRaft mode, so that we don't need Zookeeper.
+4. Setup Kafka cluster and all the exporters. This project use KRaft mode, so that we don't need Zookeeper.
 
 ```bash
 make deploy-kafka
 ```
 
-4. Setup Prometheus and Grafana, configuration file has been provided in `./prometheus` and `./grafana` directories and auto-loaded by the services.
+5. Setup Prometheus and Grafana, configuration file has been provided in `./prometheus` and `./grafana` directories and auto-loaded by the services.
 
 ```bash
 make deploy-o11y
 ```
 
-5. Setup the Kafka consumer.
+6. Setup the Kafka consumer.
 
 Consumer receives the top command output from kafka and print the 5 processes with the highest CPU usage.
 
@@ -78,7 +78,7 @@ Consumer receives the top command output from kafka and print the 5 processes wi
 make deploy-consumer
 ```
 
-6. Send top command output to Kafka.
+7. Send top command output to Kafka.
 
 >> WARNING: Linux only, because the top command output is different on macOS.
 
@@ -88,7 +88,7 @@ You can press `space` to accerlate the output, and `ctrl+c` to stop the producer
 top | docker run --rm -i --network kafka-o11y kafka-producer python app.py
 ```
 
-7. Clean up the stack.
+8. Clean up the stack.
 
 This command will stop and remove all the services, including all the volumes (docker network is not removed).
 
@@ -130,7 +130,7 @@ This dashboard provides the following metrics:
 
 - **Errors**: Shows the number of errors encountered in the Kafka cluster, which can indicate issues with message production or consumption, and should be monitored closely.
 
-![kafka-core](images/kafka-core.png)
+![kafka-core](images/kafka-core-normal.png)
 
 #### Kafka Cluster
 
@@ -198,13 +198,11 @@ You can see some core metrics are changed, including the number of active broker
 
 ![kafka-core-abnormal](images/kafka-core-abnormal.png)
 
-About a minute later, you will see the alert is triggered, and you will receive a notification on Discord.
+About a minute later, you will see the alert is triggered, and you will receive a notification on Discord. (If you set the `DISCORD_WEBHOOK_URL` variable in `.env` file)
 
 ![grafana-alert-abnormal](images/grafana-alert-abnormal.png)
 
-Notify message contains the alert name, state, summary and some service labels.
-
-You can click the link to view the alert in Grafana. (If you set the `GF_SERVER_ROOT_URL` variable in `.env` file)
+Notify message contains the alert name, state, summary and some service labels. You can click the link to view the alert in Grafana. (If you set the `GF_SERVER_ROOT_URL` variable in `.env` file)
 
 ![discord-firing](images/discord-firing.png)
 
